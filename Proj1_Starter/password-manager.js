@@ -89,7 +89,7 @@ class Keychain {
     let keychain = new Keychain();
     keychain.secrets.masterKey = masterKey; // Store the HMAC master key in the keychain privately
     keychain.secrets.aesKey = aesKey; // Store the AES key in the keychain privately
-    keychain.secrets.salt = encodeBuffer(salt); // Store the salt in the keychain privately
+    keychain.data.salt = encodeBuffer(salt); // Store the salt in the keychain privately
     
     return keychain;
   }
@@ -115,50 +115,74 @@ class Keychain {
     // Step 1: Deserialize the repr
     let parsedData = JSON.parse(repr); // parsedData is an array of two strings
 
-    // Extract the salt from the parsedData
-    let salt = decodeBuffer(parsedData[0]); // salt is stored at index 0 and is stored as a Base64 encoded string
-
-    // Step 2: Derive master key { Using PBKDF2 }(SubtleCrypto) and the provided password
-    let keyMaterial = await subtle.importKey(
-      "raw",
-      stringToBuffer(password), // Converting string to buffer
-      { name: "PBKDF2" },
-      false,
-      ["deriveKey"]
-    );
-
-    let masterKey = await subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: salt,
-        iterations: PBKDF2_ITERATIONS,
-        hash: "SHA-256"
-      },
-      keyMaterial,
-      { name: "HMAC", hash: "SHA-256", length: 256 },
-      false,
-      ["sign", "verify"]
-    );
-
-    // Step 3: Validate the intergrity of the data of a checksum is provided
-    if (trustedDataCheck) {
-      let computedHashBuffer = await subtle.digest("SHA-256", stringToBuffer(repr)); // hash of the data
-      let computedCheckSum = encodeBuffer(computedHashBuffer); // hashCheck is the hash of the data
-      if (computedCheckSum !== trustedDataCheck) {
-        throw "Integrity check failed!";
-      }
+    if(!parsedData.salt) {
+      throw new Error("Missing salt in the provided representation");
     }
 
-    // Step 4: Create a new Keychain object and return it
-    let keychain = new Keychain();
-    keychain.data.kvs = parsedData.kvs // Load the key-value store
-    keychain.data.salt = encodeBuffer(salt); // Store the salt
+    try{
+      // Extract the salt from the parsedData
+      let salt = decodeBuffer(parsedData.salt); // salt is stored at index 0 and is stored as a Base64 encoded string
 
-    // Store the derived master key (it's a  secret, so store it in keychains.secrets)
-    keychain.secrets.masterKey = masterKey; // Store the master key in the keychain privately
+      // Step 2: Derive master key { Using PBKDF2 }(SubtleCrypto) and the provided password
+      let keyMaterial = await subtle.importKey(
+        "raw",
+        stringToBuffer(password), // Converting string to buffer
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
 
-    // Step 5: Return the keychain object
-    return keychain;
+      let masterKey = await subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: PBKDF2_ITERATIONS,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "HMAC", hash: "SHA-256", length: 256 },
+        false,
+        ["sign", "verify"]
+      );
+
+      let aesKey = await subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: PBKDF2_ITERATIONS,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 }, // AES-GCM key length is 256 bits
+        false, // non-extractable
+        ["encrypt", "decrypt"] // Only for encryption and decryption
+      );
+
+      // Step 3: Validate the intergrity of the data of a checksum is provided
+      if (trustedDataCheck) {
+        let computedHashBuffer = await subtle.digest("SHA-256", stringToBuffer(repr)); // hash of the data
+        let computedCheckSum = encodeBuffer(computedHashBuffer); // hashCheck is the hash of the data
+        if (computedCheckSum !== trustedDataCheck) {
+          throw "Integrity check failed!";
+        }
+      }
+
+      // Step 4: Create a new Keychain object and return it
+      let keychain = new Keychain();
+      keychain.data.kvs = parsedData.kvs // Load the key-value store
+      keychain.data.salt = encodeBuffer(salt); // Store the salt
+
+      // Store the derived master key (it's a  secret, so store it in keychains.secrets)
+      keychain.secrets.masterKey = masterKey; // Store the master key in the keychain privately
+      keychain.secrets.aesKey = aesKey; // Store the AES key in the keychain privately
+
+      // Step 5: Return the keychain object
+      return keychain;
+
+    }catch(e){
+      // If decryption or key derivation fails, return false or handle the error
+      throw "Failed to load keychain with the provided password.";
+    }
   };
 
   /**
@@ -175,7 +199,10 @@ class Keychain {
     */ 
   async dump() {
     // Step 1: Serialize the KVS into JSON
-    let serializedKVS = JSON.stringify(this.data);
+    let serializedKVS = JSON.stringify({
+      kvs: this.data.kvs, // Store the key-value store
+      salt: this.data.salt // Store the salt
+    });
 
     // Step 2: Generate a SHA-256 checksum of the serialized KVS
     let hashBuffer = await subtle.digest("SHA-256", stringToBuffer(serializedKVS));
