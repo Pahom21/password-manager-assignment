@@ -184,7 +184,6 @@ class Keychain {
       keychain.secrets.aesKey = aesKey;
 
       return keychain;
-
     } catch (error) {
       // Only throw the error for integrity check failure (to match test expectation)
       if (error.message === "Integrity check failed.") {

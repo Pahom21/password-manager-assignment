@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Elvis Makara">
+    <!-- SEO Meta tags -->
+    <meta name="description" content="Password Manager">
+    <meta name="keywords" content="Password Manager, Password, Manager">
+    <!-- <meta name="theme-color" content="#317EFB"> -->
+    <meta name="robots" content="index, follow">
+    <meta name="googlebot" content="index, follow">
+    <meta name="google" content="nositelinkssearchbox">
+    <meta name="google" content="notranslate">
+    <!-- Style sheets -->
+    <link rel="stylesheet" href="style.css">
+    <title>Password Manager</title>
+</head>
+<body>
+    <div class="main-container">
+        <header>
+            <h1>Secure Password Manager</h1>
+            <p>Safely store and retrieve passwords for your online accounts.</p>
+        </header>
+
+        <main>
+            <!-- Keychain Initialization Section -->
+            <section aria-labelledby="initialize-keychain">
+                <h2 id="initialize-keychain">Initialize Keychain</h2>
+                <form id="keychain-init-form">
+                    <fieldset>
+                        <legend>Set a Password for Your Keychain</legend>
+                        <div class="form-group">
+                            <label for="init-password">Keychain Password:</label>
+                            <input type="password" id="init-password" placeholder="Enter keychain password" required>
+                        </div>
+                        <button type="button" onclick="initializeKeychain()">Initialize Keychain</button>
+                    </fieldset>
+                </form>
+            </section>
+            
+            <section aria-labelledby="password-management">
+                <h2 id="password-management">Password Management</h2>
+
+                <form id="password-form">
+                    <fieldset>
+                        <legend>Manage your passwords securely</legend>
+                        
+                        <div class="form-group">
+                            <label for="domain">Domain:</label>
+                            <input type="text" id="domain" placeholder="Enter domain (e.g., example.com)" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password:</label>
+                            <input type="password" id="password" placeholder="Enter password" required>
+                        </div>
+
+                        <div class="buttons">
+                            <button type="button" onclick="addPassword()">Add Password</button>
+                            <button type="button" onclick="retrievePassword()">Retrieve Password</button>
+                            <button type="button" onclick="deletePassword()">Delete Password</button>
+                        </div>
+                    </fieldset>
+                </form>
+            </section>
+
+            <section aria-labelledby="result-section">
+                <h2 id="result-section">Result</h2>
+                <output id="result" role="status" aria-live="polite"></output>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2024 Secure Password Manager. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
