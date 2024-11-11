@@ -38,6 +38,36 @@ class Keychain {
     };
   };
 
+  // Define the private deriveKey method to derive a key from the password and salt
+  async #deriveKey(password, salt) {
+    const keyMaterial = await subtle.importKey(
+        "raw",
+        stringToBuffer(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+    );
+    return subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: decodeBuffer(salt),
+            iterations: PBKDF2_ITERATIONS,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "HMAC", hash: "SHA-256", length: 256 },
+        false,
+        ["sign", "verify"]
+    );
+}
+
+// Define the private calculateChecksum method to generate a checksum of the data
+async #calculateChecksum(data) {
+    const buffer = stringToBuffer(data);
+    const hashBuffer = await subtle.digest("SHA-256", buffer);
+    return encodeBuffer(hashBuffer);
+}
+
   /** 
     * Creates an empty keychain with the given password.
     *
@@ -111,87 +141,74 @@ class Keychain {
     *   trustedDataCheck: string
     * Return Type: Keychain
     */
-  static async load(password, repr, trustedDataCheck) {
+  static async load(password, repr, trustedDataCheck) { 
+    const keychain = new Keychain();
+
     try {
-      // Step 1: Parse the JSON representation to retrieve data
-      let parsedData = JSON.parse(repr);
+        // Parse the JSON representation to retrieve key-value data and metadata
+        const parsedData = JSON.parse(repr);
+        if (!parsedData.kvs || !parsedData.salt) {
+            throw new Error("Missing essential data (kvs or salt) in the representation.");
+        }
 
-      // Step 2: Validate that salt is present
-      if (!parsedData.salt) {
-          return false;  // Return false if salt is missing, as the password likely can't be verified
-      }
+        // Derive the master key using the provided password and parsed salt
+        keychain.secrets.masterKey = await keychain.#deriveKey(password, parsedData.salt);
 
-      // Decode the salt
-      let salt = decodeBuffer(parsedData.salt);
+        // Derive the AES key using the derived master key
+        const keyMaterial = await subtle.importKey(
+            "raw",
+            stringToBuffer(password),
+            { name: "PBKDF2" },
+            false,
+            ["deriveKey"]
+        );
 
-      // Step 3: Derive the key material from the password
-      let keyMaterial = await subtle.importKey(
-          "raw",
-          stringToBuffer(password),
-          { name: "PBKDF2" },
-          false,
-          ["deriveKey"]
-      );
+        keychain.secrets.aesKey = await subtle.deriveKey(
+            {
+                name: "PBKDF2",
+                salt: decodeBuffer(parsedData.salt),
+                iterations: PBKDF2_ITERATIONS,
+                hash: "SHA-256"
+            },
+            keyMaterial,
+            { name: "AES-GCM", length: 256 },
+            false,
+            ["encrypt", "decrypt"]
+        );
 
-      // Step 4: Derive both master and AES keys
-      let masterKey = await subtle.deriveKey(
-          {
-              name: "PBKDF2",
-              salt: salt,
-              iterations: PBKDF2_ITERATIONS,
-              hash: "SHA-256"
-          },
-          keyMaterial,
-          { name: "HMAC", hash: "SHA-256", length: 256 },
-          false,
-          ["sign", "verify"]
-      );
+        // Verify checksum if provided
+        if (trustedDataCheck) {
+            const calculatedCheck = await keychain.#calculateChecksum(repr);
+            if (trustedDataCheck !== calculatedCheck) {
+                throw new Error("Checksum mismatch: data integrity verification failed.");
+            }
+        }
 
-      let aesKey = await subtle.deriveKey(
-          {
-              name: "PBKDF2",
-              salt: salt,
-              iterations: PBKDF2_ITERATIONS,
-              hash: "SHA-256"
-          },
-          keyMaterial,
-          { name: "AES-GCM", length: 256 },
-          false,
-          ["encrypt", "decrypt"]
-      );
+        // Attempt to decrypt a test entry to verify the AES key
+        for (const domain in parsedData.kvs) {
+            const { iv, ciphertext } = parsedData.kvs[domain];
+            await subtle.decrypt(
+                { name: "AES-GCM", iv: decodeBuffer(iv) },
+                keychain.secrets.aesKey,
+                decodeBuffer(ciphertext)
+            );
+        }
 
-      // Step 5: Validate integrity using checksum if provided
-      if (trustedDataCheck) {
-          let computedHashBuffer = await subtle.digest("SHA-256", stringToBuffer(repr));
-          let computedCheckSum = encodeBuffer(computedHashBuffer);
+        // Load keychain data with the parsed kvs entries if everything is successful
+        keychain.data.kvs = parsedData.kvs;
 
-          // Throw an error specifically if the checksum doesn't match
-          if (computedCheckSum !== trustedDataCheck) {
-              throw new Error("Integrity check failed.");
-          }
-      }
+        return keychain;
 
-      // Step 6: Validate that the parsed data contains the key-value store
-      if (!parsedData.kvs || typeof parsedData.kvs !== "object") {
-          return false;  // Return false if the key-value store is missing
-      }
-
-      // Step 7: Create and return Keychain object if successful
-      let keychain = new Keychain();
-      keychain.data.kvs = parsedData.kvs;
-      keychain.data.salt = encodeBuffer(salt);
-      keychain.secrets.masterKey = masterKey;
-      keychain.secrets.aesKey = aesKey;
-
-      return keychain;
     } catch (error) {
-      // Only throw the error for integrity check failure (to match test expectation)
-      if (error.message === "Integrity check failed.") {
-        throw error;
-      }
-      return false;  // Return false if an error occurs
+        // Handle the checksum error by rethrowing it so the test can capture it
+        if (error.message.includes("Checksum mismatch")) {
+            throw error;
+        }
+
+        // For any other error (likely due to incorrect password), return false
+        throw new Error("False");
     }
-  }
+}
 
   /**
     * Returns a JSON serialization of the contents of the keychain that can be 
