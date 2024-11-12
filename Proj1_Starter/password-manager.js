@@ -164,17 +164,17 @@ async #calculateChecksum(data) {
         );
 
         keychain.secrets.aesKey = await subtle.deriveKey(
-            {
-                name: "PBKDF2",
-                salt: decodeBuffer(parsedData.salt),
-                iterations: PBKDF2_ITERATIONS,
-                hash: "SHA-256"
-            },
-            keyMaterial,
-            { name: "AES-GCM", length: 256 },
-            false,
-            ["encrypt", "decrypt"]
-        );
+          {
+              name: "PBKDF2",
+              salt: decodeBuffer(parsedData.salt),
+              iterations: PBKDF2_ITERATIONS,
+              hash: "SHA-256"
+          },
+          keyMaterial,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"]
+      );
 
         // Verify checksum if provided
         if (trustedDataCheck) {

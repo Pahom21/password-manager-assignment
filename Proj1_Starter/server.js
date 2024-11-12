@@ -57,6 +57,12 @@ app.post("/delete-password", async (req, res) => {
     }
 });
 
+// Server-side handler for deinitializing the keychain
+app.post("/deinitialize", (req, res) => {
+    keychainInstance = null;  // Clear the server-side keychain instance
+    res.status(200).send("Keychain deinitialized.");
+});
+
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);

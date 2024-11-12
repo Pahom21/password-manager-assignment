@@ -75,3 +75,20 @@ async function deletePassword() {
         document.getElementById("result").innerText = "Please enter a domain to delete the password.";
     }
 }
+
+async function deinitializeKeychain() {
+    try {
+        const response = await fetch("/deinitialize", { method: "POST" });
+        if (response.ok) {
+            document.getElementById("result").innerText = "Keychain deinitialized. All data cleared.";
+            // Clear all input fields
+            document.getElementById("init-password").value = "";
+            document.getElementById("domain").value = "";
+            document.getElementById("password").value = "";
+        } else {
+            document.getElementById("result").innerText = "Error deinitializing keychain.";
+        }
+    } catch (error) {
+        document.getElementById("result").innerText = "Error connecting to server.";
+    }
+}
