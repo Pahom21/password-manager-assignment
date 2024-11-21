@@ -1,0 +1,13 @@
+{
+  "kvs": {
+    "FQqJ/w7QNdZSJDkMDed77yuhKGIPDtiZ7lJTM5ODXus=": {
+      "ciphertext": "HTTn8SsHPhzIqHw8H1MO5Ybyi/pH",
+      "iv": "0SfgQRqjsBKztuQT"
+    },
+    "tMVQuhX0dwZfVTkivqTX5vUu6Bsud/2nDJYP+6D7jHs=": {
+      "ciphertext": "1te3z0u+fVJiWHYFVs8JjEV9Eh+f3ic=",
+      "iv": "wbDPyJR9WiPfUZsF"
+    }
+  },
+  "salt": "zyc/7AmU622Vaq0XRfcs8A=="
+}

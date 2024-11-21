@@ -38,6 +38,11 @@ class Keychain {
     };
   };
 
+  // Helper method to find the nearest power of two
+  nearestPowerOfTwo(num) {
+    return Math.pow(2, Math.ceil(Math.log2(num)));
+  }
+
   // Define the private deriveKey method to derive a key from the password and salt
   async #deriveKey(password, salt) {
     const keyMaterial = await subtle.importKey(
@@ -229,7 +234,19 @@ async #calculateChecksum(data) {
       salt: this.data.salt // Store the salt
     });
 
-    // Step 2: Generate a SHA-256 checksum of the serialized KVS
+    // Step 2: Calculate to the nearest power of two for dummy entries
+    const totalRecords = Object.keys(this.data.kvs).length;
+    const paddedRecords = this.nearestPowerOfTwo(totalRecords);
+
+    //Step 3: Add dummy entries to the KVS to pad to the nearest power of two
+    for (let i = totalRecords; i < paddedRecords; i++) {
+      this.data.kvs[`dummy${i}`] = {
+        iv: "dummy_iv",
+        ciphertext: "dummy_ciphertext"
+      };
+    }
+    
+    // Step 3: Generate a SHA-256 checksum of the serialized KVS
     let hashBuffer = await subtle.digest("SHA-256", stringToBuffer(serializedKVS));
     let checksum = encodeBuffer(hashBuffer);  // Encode the hash as Base64
 

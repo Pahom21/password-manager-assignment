@@ -3,6 +3,7 @@ const path = require("path");
 const { Keychain } = require("./password-manager"); // Import Keychain
 const app = express();
 const PORT = 3000;
+const fs = require("fs");
 
 app.use(express.json()); // Middleware to parse JSON requests
 app.use(express.static(path.join(__dirname, "public"))); // Serve static files from "public"
@@ -25,6 +26,7 @@ app.post("/add-password", async (req, res) => {
     const { domain, password } = req.body;
     try {
         await keychainInstance.set(domain, password);
+        fs.writeFileSync("keychain-storage.json", JSON.stringify(keychainInstance.data, null, 2));
         res.status(200).send(`Password for ${domain} added.`);
     } catch (error) {
         res.status(500).send("Error adding password.");
@@ -48,6 +50,7 @@ app.post("/delete-password", async (req, res) => {
     try {
         const success = await keychainInstance.remove(domain);
         if (success) {
+            fs.writeFileSync("keychain-storage.json", JSON.stringify(keychainInstance.data, null, 2));
             res.status(200).send(`Password for ${domain} deleted.`);
         } else {
             res.status(404).send(`Password for ${domain} not found.`);
